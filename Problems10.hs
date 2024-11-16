@@ -204,11 +204,65 @@ Lecture 12.  But be sure to handle *all* the cases where exceptions need to
 bubble; this won't *just* be `Throw` and `Catch.
 
 -------------------------------------------------------------------------------}
-
 smallStep :: (Expr, Expr) -> Maybe (Expr, Expr)
+smallStep (Const _, acc) = Nothing
 
-smallStep (Const i, acc) = Nothing
+smallStep (Plus (Const i) (Const j), acc) = Just (Const (i + j), acc)
+smallStep (Plus m n, acc) = 
+    case smallStep (m, acc) of
+        Just (m', acc') -> Just (Plus m' n, acc')            
+        Nothing -> 
+            if isValue m then                                
+                case smallStep (n, acc) of
+                    Just (n', acc') -> Just (Plus m n', acc')
+                    Nothing -> case n of
+                        Throw w -> Just (Throw w, acc)      
+                        _ -> Nothing
+            else Nothing
+smallStep (Plus (Throw w) _, acc) = Just (Throw w, acc)      
 
+smallStep (App (Throw w) _, acc) = Just (Throw w, acc)       
+smallStep (App _ (Throw w), acc) = Just (Throw w, acc)        
+smallStep (App (Lam x m) n, acc) = 
+    if isValue n then Just (subst x n m, acc)
+    else case smallStep (n, acc) of
+        Just (n', acc') -> Just (App (Lam x m) n', acc')
+        Nothing -> Nothing
+smallStep (App m n, acc) = 
+    case smallStep (m, acc) of
+        Just (m', acc') -> Just (App m' n, acc')  
+        Nothing -> 
+            if isValue m then case smallStep (n, acc) of
+                Just (n', acc') -> Just (App m n', acc') 
+                Nothing -> Nothing
+            else Nothing
+
+smallStep (Throw (Throw w), acc) = Just (Throw w, acc)        
+
+smallStep (Catch (Throw w) x n, acc) = Just (subst x w n, acc) 
+smallStep (Catch m x n, acc) = 
+    if isValue m
+        then case m of
+            Throw w -> Just (subst x w n, acc)
+            _       -> Just (m, acc)
+    else case smallStep (m, acc) of
+        Just (m', acc') -> Just (Catch m' x n, acc')
+        Nothing         -> Nothing
+
+smallStep (Store (Throw w), acc) =                            
+    if isValue w then Just (Throw w, acc)
+    else case smallStep (w, acc) of
+        Just (w', acc') -> Just (Store (Throw w'), acc')
+        Nothing         -> Nothing
+smallStep (Store m, acc) =                                    
+    if isValue m then Just (m, m) 
+    else case smallStep (m, acc) of
+        Just (m', acc') -> Just (Store m', acc')
+        Nothing         -> Nothing
+
+smallStep (Recall, acc) = Just (acc, acc)
+
+smallStep (_, _) = Nothing
 
 steps :: (Expr, Expr) -> [(Expr, Expr)]
 steps s = case smallStep s of
