@@ -207,21 +207,21 @@ bubble; this won't *just* be `Throw` and `Catch.
 smallStep :: (Expr, Expr) -> Maybe (Expr, Expr)
 smallStep (Const _, acc) = Nothing
 
+smallStep (Plus (Throw w) _, acc) = Just (Throw w, acc) 
 smallStep (Plus (Const i) (Const j), acc) = Just (Const (i + j), acc)
 smallStep (Plus m n, acc) = 
     case smallStep (m, acc) of
-        Just (m', acc') -> Just (Plus m' n, acc')            
+        Just (m', acc') -> Just (Plus m' n, acc')           
         Nothing -> 
-            if isValue m then                                
+            if isValue m then                                 
                 case smallStep (n, acc) of
                     Just (n', acc') -> Just (Plus m n', acc')
                     Nothing -> case n of
-                        Throw w -> Just (Throw w, acc)      
+                        Throw w -> Just (Throw w, acc)       
                         _ -> Nothing
             else Nothing
-smallStep (Plus (Throw w) _, acc) = Just (Throw w, acc)      
 
-smallStep (App (Throw w) _, acc) = Just (Throw w, acc)       
+smallStep (App (Throw w) _, acc) = Just (Throw w, acc)        
 smallStep (App _ (Throw w), acc) = Just (Throw w, acc)        
 smallStep (App (Lam x m) n, acc) = 
     if isValue n then Just (subst x n m, acc)
@@ -243,7 +243,6 @@ smallStep (Catch (Throw w) x n, acc) = Just (subst x w n, acc)
 smallStep (Catch m x n, acc) = 
     if isValue m
         then case m of
-            Throw w -> Just (subst x w n, acc)
             _       -> Just (m, acc)
     else case smallStep (m, acc) of
         Just (m', acc') -> Just (Catch m' x n, acc')
@@ -271,4 +270,6 @@ steps s = case smallStep s of
 
 prints :: Show a => [a] -> IO ()
 prints = mapM_ print
+
+
 
